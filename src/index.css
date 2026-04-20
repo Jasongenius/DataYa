@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+@theme {
+  --color-accent: #2D62FF;
+  --color-bg-base: #F4F4F7;
+  --color-card-surface: #FFFFFF;
+  --color-ink-main: #1A1A1E;
+  --color-ink-sub: #6B6D76;
+  --color-border-subtle: #E5E7EB;
+  --color-success: #10B981;
+  
+  --font-sans: 'Helvetica Neue', Arial, sans-serif;
+  
+  --radius-card: 16px;
+  --radius-inner: 12px;
+}
+
+@layer base {
+  body {
+    background-color: var(--color-bg-base);
+    color: var(--color-ink-main);
+  }
+}
+
+@layer utilities {
+  .pulse-animation {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: .8;
+      transform: scale(1.05);
+    }
+  }
+
+  .shadow-bento {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  }
+}
+
