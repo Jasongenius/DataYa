@@ -37,5 +37,5 @@ export const TRACKING_STEPS = [
   { id: 'cutting', label: '精密激光裁剪', description: '激光精密切割，完美契合', image: 'https://images.unsplash.com/photo-1558346490-a72e53ae2d4f?auto=format&fit=crop&q=80&w=400' },
   { id: 'sewing', label: '手工缝制', description: '精心打造您的每一件作品', image: 'https://images.unsplash.com/photo-1524234107056-1c1f48f64ab8?auto=format&fit=crop&q=80&w=400' },
   { id: 'qc', label: '严格质检', description: '仔细检查每一个细节', image: 'https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&q=80&w=400' },
-  { id: 'shipping', label: '极速发货', description: '您的专属定制正在极速派送', image: 'https://images.unsplash.com/photo-1520923642038-b4259ace9439?auto=format&fit=crop&q=80&w=800' },
+  { id: 'shipping', label: '极速发货', description: '您的专属定制正在极速派送', image: 'https://images.unsplash.com/photo-1595246140625-573b715d11dc?auto=format&fit=crop&q=80&w=800' },
 ];

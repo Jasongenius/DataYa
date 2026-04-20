@@ -40,9 +40,10 @@ export function CheckoutView({ product, design, onComplete, onBack }: CheckoutVi
         <div className="lg:w-1/2 space-y-8">
           <button 
             onClick={onBack}
-            className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-accent hover:opacity-100 transition-opacity bg-accent/5 px-4 py-2 rounded-full mb-8 inline-flex"
+            className="group flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-accent hover:text-white transition-all bg-accent/5 hover:bg-accent px-6 py-3 rounded-full mb-8 inline-flex border border-accent/20"
           >
-            <ArrowLeft className="w-4 h-4" /> 修改订单
+            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" /> 
+            <span>返回重新选择商品</span>
           </button>
 
           <div className="bg-bg-base rounded-card aspect-square overflow-hidden relative border border-border-subtle shadow-bento">
