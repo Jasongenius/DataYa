@@ -5,14 +5,23 @@ import { CreatorView } from './views/CreatorView';
 import { MockupView } from './views/MockupView';
 import { CheckoutView } from './views/CheckoutView';
 import { TrackingView } from './views/TrackingView';
-import { Order, TRACKING_STEPS, PRODUCTS, ViewState, Design, Product } from './types';
+import { IndustrialDashboard } from './views/IndustrialDashboard';
+import { Order, PRODUCTION_STEPS, TRACKING_STEPS, PRODUCTS, ViewState, Design, Product } from './types';
 import { DuckIcon } from './components/DuckIcon';
 
+export type ExtendedViewState = ViewState | 'dashboard';
+
 export default function App() {
-  const [view, setView] = useState<ViewState>('landing');
+  const [view, setView] = useState<ExtendedViewState>('landing');
   const [currentDesign, setCurrentDesign] = useState<Design | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [order, setOrder] = useState<Order | null>(null);
+
+  // States for CreatorView to ensure persistence
+  const [creatorFiles, setCreatorFiles] = useState<string[]>([]);
+  const [creatorResults, setCreatorResults] = useState<{url: string, productId?: string}[]>([]);
+  const [creatorMode, setCreatorMode] = useState<'series' | 'select'>('series');
+  const [creatorPrompt, setCreatorPrompt] = useState('');
 
   const handleSelectDesign = (design: Design) => {
     setCurrentDesign(design);
@@ -33,8 +42,23 @@ export default function App() {
     if (!order) return;
     const currentIdx = TRACKING_STEPS.findIndex(s => s.id === order.status);
     const nextIdx = Math.min(TRACKING_STEPS.length - 1, currentIdx + 1);
-    setOrder({ ...order, status: TRACKING_STEPS[nextIdx].id as Order['status'] });
+    setOrder({ ...order, status: TRACKING_STEPS[nextIdx].id });
     setView('tracking');
+  };
+
+  const openDashboard = () => {
+    setView('dashboard');
+  };
+
+  const handleDirectOrder = (product: Product, designUrl: string) => {
+    const design: Design = {
+      id: Date.now().toString(),
+      url: designUrl,
+      type: 'original'
+    };
+    setCurrentDesign(design);
+    setSelectedProduct(product);
+    setView('checkout');
   };
 
   return (
@@ -53,7 +77,7 @@ export default function App() {
             <button onClick={() => setView('landing')} className="text-xs font-bold uppercase tracking-widest opacity-40 hover:opacity-100 transition-opacity">首页</button>
             <button onClick={() => setView('creator')} className="text-xs font-bold uppercase tracking-widest opacity-40 hover:opacity-100 transition-opacity">工作室</button>
             {order && (
-              <button onClick={advanceTracking} className="text-xs font-bold uppercase tracking-widest text-accent hover:opacity-80">追踪订单</button>
+              <button onClick={openDashboard} className="text-xs font-bold uppercase tracking-widest text-accent hover:opacity-80">追踪订单</button>
             )}
             <div className="h-4 w-[1px] bg-border-subtle mx-2" />
             <button 
@@ -76,7 +100,19 @@ export default function App() {
             transition={{ duration: 0.3, ease: 'easeOut' }}
           >
             {view === 'landing' && <LandingView onStart={() => setView('creator')} />}
-            {view === 'creator' && <CreatorView onSelectDesign={handleSelectDesign} />}
+            {view === 'creator' && (
+              <CreatorView 
+                onOrder={handleDirectOrder}
+                files={creatorFiles}
+                setFiles={setCreatorFiles}
+                results={creatorResults}
+                setResults={setCreatorResults}
+                mode={creatorMode}
+                setMode={setCreatorMode}
+                prompt={creatorPrompt}
+                setPrompt={setCreatorPrompt}
+              />
+            )}
             {view === 'mockup' && currentDesign && (
               <MockupView 
                 design={currentDesign} 
@@ -89,10 +125,11 @@ export default function App() {
                 product={selectedProduct} 
                 design={currentDesign}
                 onComplete={handleOrderComplete}
-                onBack={() => setView('mockup')}
+                onBack={() => setView('creator')}
               />
             )}
-            {view === 'tracking' && order && <TrackingView order={order} />}
+            {view === 'tracking' && order && <TrackingView order={order} onBack={() => setView('creator')} />}
+            {view === 'dashboard' && <IndustrialDashboard />}
           </motion.div>
         </AnimatePresence>
       </main>

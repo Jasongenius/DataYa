@@ -24,7 +24,7 @@ export function CheckoutView({ product, design, onComplete, onBack }: CheckoutVi
       designId: design.id,
       productId: product.id,
       quantity,
-      status: 'ordered',
+      status: 'drag', // Matching the first step in PRODUCTION_STEPS
       timestamp: new Date().toISOString(),
     };
     

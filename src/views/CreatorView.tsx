@@ -1,69 +1,100 @@
 import { useState, useRef, ChangeEvent } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Upload, Sparkles, Image as ImageIcon, Wand2, ArrowRight, Loader2, Check } from 'lucide-react';
-import { generateRedesign } from '../services/gemini';
-import { Design } from '../types';
+import { Upload, Sparkles, Image as ImageIcon, Wand2, ArrowRight, Loader2, Check, AlertCircle } from 'lucide-react';
+import { Design, PRODUCTS, Product } from '../types';
 import { cn } from '../lib/utils';
 
+type Mode = 'series' | 'select';
+
 interface CreatorViewProps {
-  onSelectDesign: (design: Design) => void;
+  onOrder: (product: Product, designUrl: string) => void;
+  files: string[];
+  setFiles: (files: string[]) => void;
+  results: {url: string, productId?: string}[];
+  setResults: (results: {url: string, productId?: string}[]) => void;
+  mode: Mode;
+  setMode: (mode: Mode) => void;
+  prompt: string;
+  setPrompt: (prompt: string) => void;
 }
 
-type Mode = 'redesign' | 'original';
-
-export function CreatorView({ onSelectDesign }: CreatorViewProps) {
-  const [mode, setMode] = useState<Mode>('redesign');
-  const [file, setFile] = useState<string | null>(null);
-  const [prompt, setPrompt] = useState('');
+export function CreatorView({ 
+  onOrder, 
+  files, 
+  setFiles, 
+  results, 
+  setResults, 
+  mode, 
+  setMode, 
+  prompt, 
+  setPrompt 
+}: CreatorViewProps) {
+  const [rawFiles, setRawFiles] = useState<File[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [results, setResults] = useState<string[]>([]);
-  const [selectedIdx, setSelectedIdx] = useState<number>(0);
+  const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFile(reader.result as string);
-        setResults([]);
-      };
-      reader.readAsDataURL(file);
+    const selectedFiles = Array.from(e.target.files || []) as File[];
+    if (selectedFiles.length > 0) {
+      setRawFiles(selectedFiles);
+      setError(null);
+      const newFiles: string[] = [];
+      let loaded = 0;
+
+      selectedFiles.forEach((file) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          newFiles.push(reader.result as string);
+          loaded++;
+          if (loaded === selectedFiles.length) {
+            setFiles(newFiles);
+            setResults([]);
+          }
+        };
+        reader.readAsDataURL(file);
+      });
     }
   };
 
   const processImage = async () => {
-    if (!file) return;
+    if (files.length === 0) return;
     setIsProcessing(true);
+    setError(null);
     setResults([]);
 
-    if (mode === 'redesign') {
-      setStatus('分析风格 DNA...');
-      await new Promise(r => setTimeout(r, 1500));
-      setStatus('生成灵感变体...');
-      const generated = await generateRedesign(file, prompt);
-      setResults(generated);
-      setSelectedIdx(0);
-    } else {
-      setStatus('优化视觉构图...');
-      await new Promise(r => setTimeout(r, 1000));
-      setStatus('去除背景...');
-      await new Promise(r => setTimeout(r, 800));
-      setResults([file]);
+    try {
+      if (mode === 'series') {
+        setStatus('正在生成全系列文创周边预览...');
+        await new Promise(r => setTimeout(r, 2000));
+        // Apply 1st image to TOP 4 products (the series items from types.ts)
+        const mockups = PRODUCTS.slice(0, 4).map(p => ({
+          url: files[0], 
+          productId: p.id
+        }));
+        setResults(mockups);
+      } else {
+        setStatus('正在将多图方案同步至目标产品...');
+        await new Promise(r => setTimeout(r, 1500));
+        // Apply ALL uploaded images to ONE specific product (the first in the list)
+        const targetProduct = PRODUCTS[2]; // Using '联名手提袋' as the target
+        const mockups = files.slice(0, 4).map(f => ({
+          url: f,
+          productId: targetProduct.id
+        }));
+        setResults(mockups);
+      }
+    } catch (err) {
+      setError("生成失败，请重试");
+    } finally {
+      setIsProcessing(false);
+      setStatus('');
     }
-    setIsProcessing(false);
-    setStatus('');
   };
 
-  const handleConfirm = () => {
-    if (results.length > 0) {
-      onSelectDesign({ 
-        id: Date.now().toString(), 
-        url: results[selectedIdx], 
-        type: mode === 'redesign' ? 'ai-generated' : 'original' 
-      });
-    }
+  const handleManualOrder = (product: Product, url: string) => {
+    onOrder(product, url);
   };
 
   return (
@@ -74,22 +105,22 @@ export function CreatorView({ onSelectDesign }: CreatorViewProps) {
           <div className="bg-card-surface border border-border-subtle rounded-card p-6 shadow-bento space-y-6 flex flex-col h-full">
             <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-accent">
               <div className="w-2 h-2 rounded-full bg-accent animate-pulse" />
-              创意输入 · 爆款基因
+              上传作品 · 开启定制
             </div>
 
             <div className="flex p-1 bg-bg-base rounded-xl">
-              {(['redesign', 'original'] as Mode[]).map((m) => (
+              {(['series', 'select'] as Mode[]).map((m) => (
                 <button
                   key={m}
-                  onClick={() => { setMode(m); setFile(null); setResults([]); }}
+                  onClick={() => { setMode(m); setFiles([]); setResults([]); }}
                   className={cn(
-                    "flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all uppercase tracking-widest",
+                    "flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all uppercase tracking-widest leading-tight",
                     mode === m 
                       ? "bg-white shadow-sm text-accent" 
                       : "text-ink-sub hover:text-ink-main"
                   )}
                 >
-                  {m === 'redesign' ? '风格二创' : '原创上传'}
+                  {m === 'series' ? '一图多模 (全系展示)' : '多图一选 (精细对比)'}
                 </button>
               ))}
             </div>
@@ -98,7 +129,7 @@ export function CreatorView({ onSelectDesign }: CreatorViewProps) {
               onClick={() => fileInputRef.current?.click()}
               className={cn(
                 "aspect-square rounded-inner border-2 border-dashed flex flex-col items-center justify-center p-8 transition-all cursor-pointer overflow-hidden relative",
-                file ? "border-accent/20 bg-accent/5" : "border-border-subtle hover:border-accent/40 hover:bg-accent/5"
+                files.length > 0 ? "border-accent/20 bg-accent/5" : "border-border-subtle hover:border-accent/40 hover:bg-accent/5"
               )}
             >
               <input 
@@ -106,35 +137,54 @@ export function CreatorView({ onSelectDesign }: CreatorViewProps) {
                 className="hidden" 
                 ref={fileInputRef} 
                 accept="image/*" 
+                multiple={mode === 'select'}
                 onChange={handleFileChange}
               />
-              {file ? (
-                <img src={file} className="absolute inset-0 w-full h-full object-cover" />
+              {files.length > 0 ? (
+                <div className="grid grid-cols-2 gap-2 w-full h-full">
+                  {files.slice(0, 4).map((f, i) => (
+                    <img key={i} src={f} className="w-full h-full object-cover rounded-sm" />
+                  ))}
+                  {files.length > 4 && (
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center text-white font-bold">
+                      +{files.length - 4}
+                    </div>
+                  )}
+                </div>
               ) : (
                 <>
                   <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center mb-4 border border-border-subtle">
                     <Upload className="w-6 h-6 text-accent" />
                   </div>
-                  <p className="font-bold text-center text-sm">点击或拖拽上传图片</p>
-                  <p className="text-[10px] text-ink-sub mt-1 font-bold uppercase tracking-widest leading-relaxed">参考图: 渐变流体派</p>
+                  <p className="font-bold text-center text-sm">
+                    {mode === 'series' ? '点去上传您的原创作品' : '点击上传多张灵感底稿'}
+                  </p>
+                  <p className="text-[10px] text-ink-sub mt-2 font-bold uppercase tracking-widest text-center leading-relaxed">
+                    支持 JPG, PNG, WEBP (最大 10MB)
+                  </p>
                 </>
               )}
             </div>
 
-            {mode === 'redesign' && (
-              <div className="space-y-4">
-                <label className="text-[10px] font-black uppercase tracking-widest opacity-40">自定义提示词 (可选)</label>
-                <textarea
-                  placeholder="例如：让风格更极简、加入潮流插画元素..."
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  className="w-full h-24 px-4 py-3 bg-bg-base rounded-inner border-none focus:ring-1 ring-accent/50 resize-none font-medium text-xs outline-none"
-                />
+            <div className="space-y-4">
+              <label className="text-[10px] font-black uppercase tracking-widest opacity-40">设计需求备注 (可选)</label>
+              <textarea
+                placeholder="例如：保持色彩鲜艳、放大主体图案..."
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                className="w-full h-24 px-4 py-3 bg-bg-base rounded-inner border-none focus:ring-1 ring-accent/50 resize-none font-medium text-xs outline-none"
+              />
+            </div>
+
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-100 rounded-inner flex items-start gap-2 text-red-600">
+                <AlertCircle className="w-3 h-3 mt-0.5 shrink-0" />
+                <p className="text-[10px] font-bold leading-tight">{error}</p>
               </div>
             )}
 
             <button
-              disabled={!file || isProcessing}
+              disabled={files.length === 0 || isProcessing}
               onClick={processImage}
               className="w-full py-4 bg-accent text-white rounded-xl font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 transition-all shadow-lg shadow-accent/20 mt-auto"
             >
@@ -146,7 +196,7 @@ export function CreatorView({ onSelectDesign }: CreatorViewProps) {
               ) : (
                 <>
                   <Sparkles className="w-4 h-4" />
-                  <span>{mode === 'redesign' ? '提取风格 DNA' : '优化设计'}</span>
+                  <span>{mode === 'series' ? '生成全系预览' : '开启多图对比'}</span>
                 </>
               )}
             </button>
@@ -159,10 +209,10 @@ export function CreatorView({ onSelectDesign }: CreatorViewProps) {
             <div className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-accent">
                 <div className="w-2 h-2 rounded-full bg-accent" />
-                AI 二次创作生成
+                文创商品虚拟展示
               </div>
               <div className="flex items-center gap-2 text-[10px] font-bold px-3 py-1 bg-bg-base rounded-full opacity-60 uppercase tracking-widest">
-                数字鸭 AI 引擎
+                OPC 渲染引擎 v2.0
               </div>
             </div>
 
@@ -181,49 +231,81 @@ export function CreatorView({ onSelectDesign }: CreatorViewProps) {
             </AnimatePresence>
 
             {results.length > 0 ? (
-              <div className="flex-1 flex flex-col">
-                <div className="grid grid-cols-2 gap-4 flex-1">
-                  {results.slice(0, 4).map((r, i) => (
-                    <motion.div
-                      key={i}
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: i * 0.1 }}
-                      className={cn(
-                        "group relative cursor-pointer",
-                        selectedIdx === i ? "ring-4 ring-accent rounded-inner" : ""
-                      )}
-                      onClick={() => setSelectedIdx(i)}
-                    >
-                      <div className="w-full h-full bg-bg-base rounded-inner overflow-hidden border border-border-subtle shadow-sm flex items-center justify-center">
-                        <img src={r} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
-                        <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm px-2 py-1 rounded text-[10px] font-black text-accent shadow-sm">
-                          匹配度 {98 - i * 5}%
-                        </div>
-                      </div>
-                      {selectedIdx === i && (
-                        <div className="absolute inset-0 bg-accent/10 flex items-center justify-center pointer-events-none rounded-inner">
-                          <div className="bg-accent text-white p-2 rounded-full shadow-lg">
-                            <Check className="w-6 h-6" />
+              <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {results.map((r, i) => {
+                    const product = PRODUCTS.find(p => p.id === r.productId);
+                    if (!product) return null;
+                    return (
+                      <motion.div
+                        key={i}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.1 }}
+                        className="group relative bg-white rounded-inner overflow-hidden border border-border-subtle shadow-sm hover:shadow-xl hover:border-accent/40 transition-all flex flex-col"
+                      >
+                        <div className="aspect-square relative flex items-center justify-center p-4 bg-white">
+                          {/* Mould Image - Pure White Background Look */}
+                          <img 
+                            src={product.image} 
+                            className="w-full h-full object-contain mix-blend-multiply transition-opacity duration-300" 
+                            referrerPolicy="no-referrer"
+                          />
+                          
+                          {/* User Design Overlay - Precisely centered print effect */}
+                          <div className="absolute inset-0 flex items-center justify-center p-[25%] pointer-events-none">
+                            <img 
+                              src={r.url} 
+                              className="w-full h-full object-contain mix-blend-multiply opacity-90 drop-shadow-sm group-hover:scale-110 transition-transform duration-500" 
+                            />
+                          </div>
+
+                          {/* Hover Action: Order Button */}
+                          <div className="absolute inset-0 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/5 backdrop-blur-[1px]">
+                            <button
+                              onClick={() => handleManualOrder(product, r.url)}
+                              className="bg-accent text-white px-8 py-3 rounded-full font-black text-xs uppercase tracking-[0.2em] shadow-xl transform translate-y-4 group-hover:translate-y-0 transition-all duration-300 active:scale-90"
+                            >
+                              立即下单该款
+                            </button>
                           </div>
                         </div>
-                      )}
-                    </motion.div>
-                  ))}
+
+                        <div className="p-4 bg-white flex items-center justify-between border-t border-border-subtle">
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-accent opacity-60">
+                              {product.category}
+                            </p>
+                            <p className="font-black text-sm uppercase tracking-wider mt-0.5">
+                              {product.name}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-[10px] font-medium opacity-40 uppercase tracking-widest">单价</p>
+                            <p className="font-black text-accent italic">¥{product.price}.00</p>
+                          </div>
+                        </div>
+                        
+                        {/* Always visible buy small button for mobile */}
+                        <button 
+                          onClick={() => handleManualOrder(product, r.url)}
+                          className="md:hidden absolute top-4 right-4 bg-accent text-white p-2 rounded-full shadow-lg"
+                        >
+                          <Check className="w-4 h-4" />
+                        </button>
+                      </motion.div>
+                    );
+                  })}
                 </div>
-                <div className="flex gap-4 mt-8 pt-8 border-t border-border-subtle">
-                   <button 
-                     onClick={processImage}
-                     className="flex-1 py-4 bg-bg-base border border-border-subtle rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-border-subtle transition-colors"
-                   >
-                     批量重新生成
-                   </button>
-                   <button 
-                     onClick={handleConfirm}
-                     className="flex-1 py-4 bg-accent text-white rounded-xl text-xs font-bold uppercase tracking-widest shadow-lg shadow-accent/20 transition-transform active:scale-95"
-                   >
-                     确认设计并预览
-                   </button>
+                
+                <div className="mt-8 flex justify-center">
+                  <button 
+                    onClick={processImage}
+                    className="flex items-center gap-2 px-10 py-4 bg-bg-base border border-border-subtle rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-white hover:border-accent transition-all animate-bounce"
+                  >
+                    <ArrowRight className="w-3 h-3 rotate-180" />
+                    <span>重新渲染全系预览</span>
+                  </button>
                 </div>
               </div>
             ) : !isProcessing && (
@@ -232,9 +314,12 @@ export function CreatorView({ onSelectDesign }: CreatorViewProps) {
                   <ImageIcon className="w-10 h-10 text-black/10" />
                 </div>
                 <div className="space-y-1">
-                  <p className="font-bold text-lg">暂无设计</p>
-                  <p className="text-black/30 font-medium max-w-[280px]">
-                    在左侧面板上传图片点击生成，我们将为你打造专属艺术。
+                  <p className="font-bold text-lg text-ink-main">待生成作品预览</p>
+                  <p className="text-ink-sub font-medium max-w-[320px] text-sm">
+                    {mode === 'series' 
+                      ? '上传一张您的原创大作，我们将全自动适配多款爆款文创周边。' 
+                      : '上传多张灵感草图，我们将统一应用至同一款高精底胚中供您对比。'
+                    }
                   </p>
                 </div>
               </div>
